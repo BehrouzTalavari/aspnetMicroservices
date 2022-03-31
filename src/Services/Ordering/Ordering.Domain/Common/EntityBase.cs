@@ -8,6 +8,4 @@
         public string LastModifiedBy { get; set; }
         public DateTime? LastModifiedDate { get; set; }
     }
-    
-    
 }
