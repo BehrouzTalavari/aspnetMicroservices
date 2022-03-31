@@ -3,22 +3,31 @@ using Basket.API.Repositories;
 
 using Discount.Grpc.Protos;
 
+using MassTransit;
+
 var builder = WebApplication.CreateBuilder(args);
+ 
 
-// Add services to the container.
-
-
-builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+// Redis Configuration
 builder.Services.AddStackExchangeRedisCache(opt =>
 {
     opt.Configuration = builder.Configuration.GetValue<string>("CacheSettings:ConnectionString");
 });
 
-builder.Services.AddScoped<IBasketRepository, BasketRepository>();
+// MassTransit-RabbitMQ Configuration
+builder.Services.AddMassTransit(config => {
+    config.UsingRabbitMq((ctx, cfg) => {
+        cfg.Host(builder.Configuration["EventBusSettings:HostAddress"]);
+    });
+});
+builder.Services.Configure<MassTransitHostOptions>(options =>
+{
+    options.WaitUntilStarted = true;
+    options.StartTimeout = TimeSpan.FromSeconds(30);
+    options.StopTimeout = TimeSpan.FromMinutes(1);
+});
 
+// Grpc Configuration
 builder.Services.AddGrpcClient<DiscountProtoService.DiscountProtoServiceClient>(o =>
 {
     o.Address = new Uri(builder.Configuration["GrpcSettings:DiscountUrl"]);
@@ -26,6 +35,17 @@ builder.Services.AddGrpcClient<DiscountProtoService.DiscountProtoServiceClient>(
 
 builder.Services.AddScoped<DiscountGrpcService>();
 
+
+//General Configuration
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+builder.Services.AddAutoMapper(typeof(Program));
+
+
+builder.Services.AddScoped<IBasketRepository, BasketRepository>();
+
+//Middlewares
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
